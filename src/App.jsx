@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import Sidebar from './components/Sidebar'
-import Header from './components/HEader'
+import Header from './components/Header'
 import OrderPanel from './components/OrderPanel'
 import Modal from './components/Modal'
 import VoiceOrderModal from './components/VoiceOrderModal'
