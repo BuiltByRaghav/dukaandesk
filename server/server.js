@@ -107,19 +107,26 @@ app.use((err, req, res, next) => {
 
 /* ---------- Start server ---------- */
 
-const server = app.listen(PORT, () => {
-  console.log(`DukaanDesk server running on http://localhost:${PORT}`)
-  console.log(`Allowed website(s): ${allowedOrigins.join(', ')}`)
-  if (!process.env.GNANI_API_KEY) {
-    console.warn('Warning: GNANI_API_KEY is empty, so voice recording is disabled.')
-  }
-})
+/* ---------- Start server ---------- */
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use. Close the other program or change PORT in .env.`)
-  } else {
-    console.error('Server failed to start:', err.message)
-  }
-  process.exit(1)
-})
+// Vercel imports the app; locally (npm run dev) we start it ourselves
+if (require.main === module) {
+  const server = app.listen(PORT, () => {
+    console.log(`DukaanDesk server running on http://localhost:${PORT}`)
+    console.log(`Allowed website(s): ${allowedOrigins.join(', ')}`)
+    if (!process.env.GNANI_API_KEY) {
+      console.warn('Warning: GNANI_API_KEY is empty, so voice recording is disabled.')
+    }
+  })
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. Close the other program or change PORT in .env.`)
+    } else {
+      console.error('Server failed to start:', err.message)
+    }
+    process.exit(1)
+  })
+}
+
+module.exports = app

@@ -1,6 +1,6 @@
 // All communication with the backend lives in this one file.
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 const TOKEN_KEY = 'dukaandesk_token'
 
 /* ---------- Login token (kept in this browser) ---------- */
