@@ -1,7 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-
-const languages = ['English']
+import { motion } from 'framer-motion'
 
 function getGreeting() {
   const hour = new Date().getHours()
@@ -10,21 +7,7 @@ function getGreeting() {
   return 'Good evening'
 }
 
-function Header({ language, onLanguageChange, onMenuClick, draftQty, onOpenPanel }) {
-  const [dropdownOpen, setDropdownOpen] = useState(false)
-  const dropdownRef = useRef(null)
-
-  // Close the dropdown when clicking anywhere outside it
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
+function Header({ onMenuClick, draftQty, onOpenPanel }) {
   const today = new Date().toLocaleDateString('en-IN', {
     weekday: 'long',
     day: 'numeric',
@@ -46,46 +29,6 @@ function Header({ language, onLanguageChange, onMenuClick, draftQty, onOpenPanel
       </div>
 
       <div className="header-right">
-        <div className="dropdown" ref={dropdownRef}>
-          <button
-            className="dropdown-trigger"
-            onClick={() => setDropdownOpen((open) => !open)}
-            aria-haspopup="listbox"
-            aria-expanded={dropdownOpen}
-          >
-            <span className="emoji">🌐</span>
-            <span>{language}</span>
-            <span className={`chevron ${dropdownOpen ? 'open' : ''}`}>▾</span>
-          </button>
-
-          <AnimatePresence>
-            {dropdownOpen && (
-              <motion.ul
-                className="dropdown-menu"
-                role="listbox"
-                initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                transition={{ duration: 0.15 }}
-              >
-                {languages.map((lang) => (
-                  <li key={lang}>
-                    <button
-                      className={`dropdown-option ${lang === language ? 'selected' : ''}`}
-                      onClick={() => {
-                        onLanguageChange(lang)
-                        setDropdownOpen(false)
-                      }}
-                    >
-                      {lang}
-                    </button>
-                  </li>
-                ))}
-              </motion.ul>
-            )}
-          </AnimatePresence>
-        </div>
-
         <button className="btn btn-primary new-order-btn" onClick={onOpenPanel}>
           <span className="emoji">🧺</span>
           <span className="new-order-label">New Order</span>
