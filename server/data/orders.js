@@ -63,7 +63,7 @@ const createOrder = db.transaction(({ customer, items }) => {
   // The next number is worked out inside the transaction, so two orders can never share an ID
   const num = Math.max(maxNum.get().max || 1000, 1000) + 1
   const id = `ORD-${num}`
-  const total = items.reduce((sum, item) => sum + item.price * item.qty, 0)
+  const total = Math.round(items.reduce((sum, item) => sum + item.price * item.qty, 0) * 100) / 100
 
   insertOrder.run(num, id, customer, total, Date.now())
   for (const item of items) {

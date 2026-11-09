@@ -1,8 +1,10 @@
 const express = require('express')
-const { products } = require('../data/products')
+const store = require('../data/productStore')
 const orders = require('../data/orders')
 
 const router = express.Router()
+
+const MAX_QTY = 100
 
 // GET /api/orders
 // Optional filter: /api/orders?status=active  or  /api/orders?status=done
@@ -36,36 +38,42 @@ router.post('/', (req, res) => {
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: 'An order needs at least one item' })
   }
-
-  // Combine duplicates, e.g. productId 7 listed twice becomes one line
-  const merged = {}
-
-  for (const entry of items) {
-    const productId = Number(entry.productId)
-    const qty = Number(entry.qty)
-
-    if (!Number.isInteger(qty) || qty < 1 || qty > 100) {
-      return res.status(400).json({ error: 'qty must be a whole number from 1 to 100' })
-    }
-
-    // Prices always come from the server catalogue, never from the client
-    const product = products.find((p) => p.id === productId)
-    if (!product) {
-      return res.status(400).json({ error: `Product ${entry.productId} does not exist` })
-    }
-
-    merged[productId] = (merged[productId] || 0) + qty
+  if (items.length > 200) {
+    return res.status(400).json({ error: 'Too many items in one order' })
   }
 
-  const orderItems = Object.entries(merged).map(([productId, qty]) => {
-    const product = products.find((p) => p.id === Number(productId))
+  // Prices always come from the shop's catalogue in the database, never from the client
+  const catalogue = new Map(store.listProducts().map((p) => [p.id, p]))
+
+  // Combine duplicates, e.g. productId 7 listed twice becomes one line
+  const merged = new Map()
+
+  for (const entry of items) {
+    const productId = Number(entry && entry.productId)
+    const qty = Number(entry && entry.qty)
+
+    if (!Number.isFinite(qty) || qty < 0.001 || qty > MAX_QTY) {
+      return res.status(400).json({ error: 'qty must be a number from 0.001 to 100' })
+    }
+
+    if (!catalogue.has(productId)) {
+      return res
+        .status(400)
+        .json({ error: `Product ${entry && entry.productId} is not in your catalogue` })
+    }
+
+    merged.set(productId, (merged.get(productId) || 0) + qty)
+  }
+
+  const orderItems = [...merged.entries()].map(([productId, qty]) => {
+    const product = catalogue.get(productId)
     return {
       productId: product.id,
       name: product.name,
       emoji: product.emoji,
       price: product.price,
       unit: product.unit,
-      qty: Math.min(qty, 100),
+      qty: Math.min(Math.round(qty * 1000) / 1000, MAX_QTY),
     }
   })
 

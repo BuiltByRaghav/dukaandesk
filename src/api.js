@@ -118,11 +118,12 @@ export function markOrderDone(orderId) {
 /* ---------- Voice ---------- */
 
 // Turn typed text into a preview of products and quantities.
+// "choices" = words the shopkeeper already clarified, e.g. { tamater: 7 }.
 // This does NOT create an order.
-export function parseVoiceText(text) {
+export function parseVoiceText(text, choices = {}) {
   return request('/voice/parse', {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, choices }),
   })
 }
 
@@ -148,4 +149,28 @@ export function updateProductPrice(productId, price) {
     method: 'PATCH',
     body: JSON.stringify({ price }),
   })
+}
+
+
+export function createProduct(data) {
+  return request('/products', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export function updateProduct(productId, data) {
+  return request(`/products/${productId}`, { method: 'PATCH', body: JSON.stringify(data) })
+}
+
+export function deleteProduct(productId) {
+  return request(`/products/${productId}`, { method: 'DELETE' })
+}
+
+export function addProductAlias(productId, alias) {
+  return request(`/products/${productId}/aliases`, {
+    method: 'POST',
+    body: JSON.stringify({ alias }),
+  })
+}
+
+export function removeProductAlias(productId, aliasId) {
+  return request(`/products/${productId}/aliases/${aliasId}`, { method: 'DELETE' })
 }

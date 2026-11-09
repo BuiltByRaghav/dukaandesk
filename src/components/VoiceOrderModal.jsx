@@ -6,13 +6,18 @@ import './VoiceOrderModal.css'
 
 const MAX_SECONDS = 25 // Gnani accepts up to 30 seconds
 
-function VoiceOrderModal({ isOpen, onClose, onAddItems }) {
+function VoiceOrderModal({ isOpen, onClose, onAddItems, products = [], onAliasesChanged }) {
   const [text, setText] = useState('')
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
   const [parsing, setParsing] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
+
+  // Words the shopkeeper has already clarified, e.g. { tamater: 7 }
+  const [choices, setChoices] = useState({})
+  const [remember, setRemember] = useState(false)
+  const [skipUnclear, setSkipUnclear] = useState(false)
 
   const recorderRef = useRef(null)
   const streamRef = useRef(null)
@@ -53,6 +58,8 @@ function VoiceOrderModal({ isOpen, onClose, onAddItems }) {
       setText('')
       setResult(null)
       setError('')
+      setChoices({})
+      setSkipUnclear(false)
     }
   }, [isOpen])
 
@@ -60,7 +67,7 @@ function VoiceOrderModal({ isOpen, onClose, onAddItems }) {
   useEffect(() => () => cancelRecording(), [])
 
   // Typed text: send the sentence to the server and show the preview
-  async function understand(sentence) {
+  async function understand(sentence, useChoices = choices) {
     const clean = sentence.trim()
     if (!clean) {
       setError('Say or type an order first.')
@@ -70,15 +77,34 @@ function VoiceOrderModal({ isOpen, onClose, onAddItems }) {
     setParsing(true)
     setError('')
     setResult(null)
+    setSkipUnclear(false)
 
     try {
-      const data = await api.parseVoiceText(clean)
+      const data = await api.parseVoiceText(clean, useChoices)
       setResult(data)
     } catch (err) {
       setError(err.message)
     } finally {
       setParsing(false)
     }
+  }
+
+  // The shopkeeper picked a product for an unclear word: ask the server again with that choice
+  async function chooseProduct(word, productId) {
+    const id = Number(productId)
+    if (!id) return
+
+    const next = { ...choices, [word]: id }
+    setChoices(next)
+
+    if (remember) {
+      api
+        .addProductAlias(id, word)
+        .then(() => onAliasesChanged && onAliasesChanged())
+        .catch(() => {}) // Saving the word is a bonus; the order still works without it
+    }
+
+    await understand(text, next)
   }
 
   // Runs when the recording stops: convert, upload, show the result
@@ -121,6 +147,8 @@ function VoiceOrderModal({ isOpen, onClose, onAddItems }) {
     setError('')
     setResult(null)
     setText('')
+    setChoices({})
+    setSkipUnclear(false)
 
     const session = sessionRef.current
 
@@ -165,13 +193,14 @@ function VoiceOrderModal({ isOpen, onClose, onAddItems }) {
     }
   }
 
-  function handleAdd() {
-    if (result && result.items.length > 0) {
-      onAddItems(result.items)
-    }
-  }
-
   const busy = transcribing || parsing
+  const clarifications = result ? result.clarifications || [] : []
+  const items = result ? result.items || [] : []
+  const canAdd = items.length > 0 && !busy && (clarifications.length === 0 || skipUnclear)
+
+  function handleAdd() {
+    if (canAdd) onAddItems(items)
+  }
 
   let statusText = 'Tap the mic and speak. Language is detected automatically.'
   if (recording) statusText = 'Listening... tap again when you are done.'
@@ -218,13 +247,14 @@ function VoiceOrderModal({ isOpen, onClose, onAddItems }) {
 
       {result && result.transcript && (
         <div className="voice-result">
-          {result.understood ? (
+          {items.length > 0 && (
             <>
               <ul className="summary-list">
-                {result.items.map((item) => (
+                {items.map((item) => (
                   <li key={item.productId} className="summary-line">
                     <span>
-                      <span className="emoji">{item.emoji}</span> {item.name} × {item.qty}
+                      <span className="emoji">{item.emoji}</span> {item.name} × {item.qty} {item.unit}
+                      {item.assumedQty && <span className="voice-assumed"> (quantity assumed)</span>}
                     </span>
                     <span>₹{(item.price * item.qty).toLocaleString('en-IN')}</span>
                   </li>
@@ -235,10 +265,75 @@ function VoiceOrderModal({ isOpen, onClose, onAddItems }) {
                 <strong>₹{result.total.toLocaleString('en-IN')}</strong>
               </div>
             </>
-          ) : (
+          )}
+
+          {clarifications.length > 0 && (
+            <div className="voice-clarify">
+              <p className="voice-clarify-title">I need your help with this:</p>
+
+              {clarifications.map((c, position) => (
+                <div key={`${c.type}-${c.word || position}`} className="voice-clarify-item">
+                  <p>{c.message}</p>
+
+                  {c.options.length > 0 && (
+                    <div className="voice-options">
+                      {c.options.map((option) => (
+                        <button
+                          key={option.productId}
+                          className="btn btn-soft"
+                          disabled={busy}
+                          onClick={() => chooseProduct(c.word, option.productId)}
+                        >
+                          <span className="emoji">{option.emoji}</span> {option.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {c.pick && (
+                    <select
+                      defaultValue=""
+                      disabled={busy}
+                      onChange={(e) => chooseProduct(c.word, e.target.value)}
+                    >
+                      <option value="" disabled>
+                        Choose a product…
+                      </option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              ))}
+
+              <label className="voice-remember">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                />
+                Remember the words I pick for next time
+              </label>
+
+              {items.length > 0 && !skipUnclear && (
+                <button className="link-btn" onClick={() => setSkipUnclear(true)}>
+                  Skip the unclear part and use the rest
+                </button>
+              )}
+            </div>
+          )}
+
+          {items.length === 0 && clarifications.length === 0 && (
             <p className="voice-error">
               I couldn't find any products in that sentence. Try again or type it.
             </p>
+          )}
+
+          {result.ignored && result.ignored.length > 0 && (
+            <p className="voice-note">Not used: {result.ignored.join(', ')}</p>
           )}
         </div>
       )}
@@ -247,11 +342,7 @@ function VoiceOrderModal({ isOpen, onClose, onAddItems }) {
         <button className="btn btn-soft" onClick={onClose}>
           Cancel
         </button>
-        <button
-          className="btn btn-primary"
-          onClick={handleAdd}
-          disabled={!result || !result.understood || busy}
-        >
+        <button className="btn btn-primary" onClick={handleAdd} disabled={!canAdd}>
           Add to order
         </button>
       </div>

@@ -1,5 +1,6 @@
 const express = require('express')
 const multer = require('multer')
+const store = require('../data/productStore')
 const { parseTranscript } = require('../services/orderParser')
 const { isConfigured, transcribeAudio } = require('../services/gnaniService')
 
@@ -15,32 +16,37 @@ const upload = multer({
 // so we handle one voice recording at a time.
 let busy = false
 
-// Converts Hindi/Marathi (०-९) and Gujarati (૦-૯) digits into 0-9
-function normalizeDigits(text) {
-  return text
-    .replace(/[०-९]/g, (d) => String('०१२३४५६७८९'.indexOf(d)))
-    .replace(/[૦-૯]/g, (d) => String('૦૧૨૩૪૫૬૭૮૯'.indexOf(d)))
+// Only accepts { "word": productId } pairs; anything else is dropped
+function cleanChoices(raw) {
+  const out = {}
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out
+
+  for (const [word, id] of Object.entries(raw).slice(0, 20)) {
+    if (word.length <= 60 && Number.isInteger(id)) out[word] = id
+  }
+  return out
 }
 
-// Turns a sentence into the preview shape the React app expects
-function buildPreview(text) {
-  const clean = normalizeDigits(text.trim())
-  const items = parseTranscript(clean)
-  const total = items.reduce((sum, item) => sum + item.price * item.qty, 0)
+// Turns a sentence into the preview the React app shows. Prices and totals come from the database.
+function buildPreview(text, choices = {}) {
+  const { items, clarifications, ignored } = parseTranscript(text, store.getCatalogue(), { choices })
+  const sum = items.reduce((total, item) => total + item.price * item.qty, 0)
 
   return {
     transcript: text.trim(),
     understood: items.length > 0,
     items,
-    total,
+    clarifications,
+    ignored,
+    total: Math.round(sum * 100) / 100,
   }
 }
 
 // POST /api/voice/parse
-// Body: { "text": "2 kilo tamatar aur 1 doodh" }
+// Body: { "text": "2 kilo tamatar aur 1 doodh", "choices": { "tamater": 7 } }  (choices optional)
 // Returns a PREVIEW. It does not create an order.
 router.post('/parse', (req, res) => {
-  const { text } = req.body || {}
+  const { text, choices } = req.body || {}
 
   if (typeof text !== 'string' || text.trim() === '') {
     return res.status(400).json({ error: 'text is required' })
@@ -50,7 +56,7 @@ router.post('/parse', (req, res) => {
     return res.status(400).json({ error: 'text is too long (max 500 characters)' })
   }
 
-  res.json(buildPreview(text))
+  res.json(buildPreview(text, cleanChoices(choices)))
 })
 
 // POST /api/voice/transcribe

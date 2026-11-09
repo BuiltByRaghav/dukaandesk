@@ -46,7 +46,7 @@ app.disable('x-powered-by')
 app.use(
   cors({
     origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PATCH'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   }),
 )

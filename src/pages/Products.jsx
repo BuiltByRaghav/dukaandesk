@@ -1,14 +1,21 @@
 import { useState } from 'react'
 import ProductCard from '../components/ProductCard'
-import { categories } from '../data/products'
+import { categories as baseCategories } from '../data/products'
 
 function Products({ products, quantities, onAdd }) {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All')
 
+  // Built-in categories first, then any category the shopkeeper created
+  const extra = [...new Set(products.map((p) => p.category))].filter(
+    (c) => !baseCategories.includes(c),
+  )
+  const categories = [...baseCategories, ...extra]
+  const activeCategory = categories.includes(category) ? category : 'All'
+
   const filtered = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(search.trim().toLowerCase())
-    const matchesCategory = category === 'All' || product.category === category
+    const matchesCategory = activeCategory === 'All' || product.category === activeCategory
     return matchesSearch && matchesCategory
   })
 
@@ -31,7 +38,7 @@ function Products({ products, quantities, onAdd }) {
           {categories.map((cat) => (
             <button
               key={cat}
-              className={`chip ${category === cat ? 'active' : ''}`}
+              className={`chip ${activeCategory === cat ? 'active' : ''}`}
               onClick={() => setCategory(cat)}
             >
               {cat}

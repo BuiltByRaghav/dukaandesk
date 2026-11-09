@@ -10,6 +10,7 @@ import Products from './pages/Products'
 import Orders from './pages/Orders'
 import { products as localProducts } from './data/products'
 import PriceEditor from './components/PriceEditor'
+import ProductManager from './components/ProductManager'
 import * as api from './api'
 
 /* ---------- Helper functions ---------- */
@@ -69,20 +70,27 @@ function App({onLogout}) {
     loadOrders()
   }, [])
 
-  useEffect(() => {
-    api
-      .fetchProducts()
-      .then((data) => {
-        setProducts((prev) =>
-          prev.map((p) => {
-            const fresh = data.products.find((x) => x.id === p.id)
-            return fresh ? { ...p, price: fresh.price } : p
+  // Loads the shop's full catalogue (built-in + custom) and keeps the draft order in step:
+  // removed products disappear from it and changed prices refresh.
+  async function loadProducts() {
+    try {
+      const data = await api.fetchProducts()
+      setProducts(data.products)
+      setDraft((prev) =>
+        prev
+          .filter((item) => data.products.some((p) => p.id === item.productId))
+          .map((item) => {
+            const fresh = data.products.find((p) => p.id === item.productId)
+            return { ...item, name: fresh.name, price: fresh.price, unit: fresh.unit }
           }),
-        )
-      })
-      .catch(() => {
-        // Keep the built-in prices; the server will still charge the correct ones
-      })
+      )
+    } catch (err) {
+      // Keep what we have; the server still charges the correct prices
+    }
+  }
+
+  useEffect(() => {
+    loadProducts()
   }, [])
 
   /* ----- Values calculated from state (they update automatically) ----- */
@@ -127,7 +135,7 @@ function App({onLogout}) {
           // Already in the draft: increase the quantity (max 100, same as the server)
           next[index] = {
             ...next[index],
-            qty: Math.min(100, next[index].qty + voiceItem.qty),
+           qty: Math.min(100, Math.round((next[index].qty + voiceItem.qty) * 1000) / 1000),
           }
         } else {
           next.push({ ...voiceItem })
@@ -222,6 +230,7 @@ function App({onLogout}) {
         return (
           <div className="page">
             <h2 className="page-title">Settings</h2>
+            <ProductManager products={products} onChanged={loadProducts} />
             <PriceEditor products={products} onSaved={handlePriceSaved} />
             <div className="card empty" style={{ marginTop: 16 }}>
               <button className="btn btn-soft" onClick={onLogout}>
@@ -329,6 +338,8 @@ function App({onLogout}) {
           isOpen={voiceOpen}
           onClose={() => setVoiceOpen(false)}
           onAddItems={addVoiceItems}
+          products={products}
+          onAliasesChanged={loadProducts}
         />
 
         <OrderPanel

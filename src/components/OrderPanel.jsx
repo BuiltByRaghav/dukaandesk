@@ -78,7 +78,7 @@ function OrderPanel({
                       <div className="draft-info">
                         <p className="draft-name">{item.name}</p>
                         <p className="draft-price">
-                          ₹{item.price} × {item.qty} = ₹{item.price * item.qty}
+                        ₹{item.price} × {item.qty} = ₹{Math.round(item.price * item.qty * 100) / 100}
                         </p>
                       </div>
                       <div className="qty">
