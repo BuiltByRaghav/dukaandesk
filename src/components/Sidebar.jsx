@@ -30,7 +30,7 @@ function Sidebar({ page, onNavigate, isOpen, onClose, activeCount }) {
 
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
-          <img src="/assets/logo.png" alt="DukaanDesk logo" />
+          <img src="src/assets/logo.png" alt="DukaanDesk logo" />
           <span>DukaanDesk</span>
         </div>
 
